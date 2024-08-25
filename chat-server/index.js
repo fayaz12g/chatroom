@@ -27,21 +27,30 @@ function findAvailableRoom() {
 }
 
 io.on('connection', (socket) => {
+  console.log('New connection established:', socket.id);
   let currentRoom = null;
 
   socket.on('join', (username) => {
+    console.log(`User ${username} attempting to join`);
     currentRoom = findAvailableRoom();
     socket.join(currentRoom);
     rooms.get(currentRoom).users.add(username);
     
+    console.log(`User ${username} joined room ${currentRoom}`);
     io.to(currentRoom).emit('user joined', `${username} has entered the conversation`);
     
     // Send last 10 messages to the user
-    socket.emit('chat history', rooms.get(currentRoom).messages.slice(-10));
+    const recentMessages = rooms.get(currentRoom).messages.slice(-10);
+    console.log(`Sending chat history to ${username}:`, recentMessages);
+    socket.emit('chat history', recentMessages);
   });
 
   socket.on('new message', (msg) => {
-    if (!currentRoom) return;
+    console.log('New message received:', msg);
+    if (!currentRoom) {
+      console.log('Error: Message received but user not in a room');
+      return;
+    }
     
     const messageData = {
       user: msg.user,
@@ -49,6 +58,7 @@ io.on('connection', (socket) => {
       timestamp: Date.now(),
     };
     rooms.get(currentRoom).messages.push(messageData);
+    console.log(`Broadcasting message to room ${currentRoom}:`, messageData);
     io.to(currentRoom).emit('new message', messageData);
     
     // Set timeout to delete message after 60 seconds
@@ -56,17 +66,20 @@ io.on('connection', (socket) => {
       const index = rooms.get(currentRoom).messages.findIndex(m => m.timestamp === messageData.timestamp);
       if (index !== -1) {
         rooms.get(currentRoom).messages.splice(index, 1);
+        console.log(`Deleting message in room ${currentRoom}:`, messageData);
         io.to(currentRoom).emit('delete message', messageData.timestamp);
       }
     }, 60000);
   });
 
   socket.on('leave', (username) => {
+    console.log(`User ${username} leaving`);
     if (currentRoom) {
       rooms.get(currentRoom).users.delete(username);
       io.to(currentRoom).emit('user left', `${username} has left the conversation`);
       
       if (rooms.get(currentRoom).users.size === 0) {
+        console.log(`Closing empty room ${currentRoom}`);
         rooms.delete(currentRoom);
       }
       
@@ -76,15 +89,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    console.log(`Socket ${socket.id} disconnected`);
     if (currentRoom) {
       const username = Array.from(rooms.get(currentRoom).users).find(user => 
         io.sockets.adapter.rooms.get(currentRoom).has(socket.id)
       );
       if (username) {
+        console.log(`User ${username} disconnected from room ${currentRoom}`);
         rooms.get(currentRoom).users.delete(username);
         io.to(currentRoom).emit('user left', `${username} has left the conversation`);
         
         if (rooms.get(currentRoom).users.size === 0) {
+          console.log(`Closing empty room ${currentRoom}`);
           rooms.delete(currentRoom);
         }
       }
