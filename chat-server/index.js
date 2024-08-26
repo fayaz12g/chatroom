@@ -37,10 +37,23 @@ io.on('connection', (socket) => {
     rooms.get(currentRoom).users.add(username);
     
     console.log(`User ${username} joined room ${currentRoom}`);
-    io.to(currentRoom).emit('user joined', `${username} has entered the conversation`);
     
-    // Send last 10 messages to the user
-    const recentMessages = rooms.get(currentRoom).messages.slice(-10);
+    // Send room number to the client
+    socket.emit('room info', currentRoom);
+    
+    // Send system message about user joining
+    const joinMessage = {
+      user: 'System',
+      text: `${username} has entered the conversation`,
+      timestamp: Date.now(),
+      isSystemMessage: true
+    };
+    rooms.get(currentRoom).messages.push(joinMessage);
+    io.to(currentRoom).emit('new message', joinMessage);
+    
+    // Send last minute of messages to the user
+    const oneMinuteAgo = Date.now() - 60000;
+    const recentMessages = rooms.get(currentRoom).messages.filter(msg => msg.timestamp > oneMinuteAgo);
     console.log(`Sending chat history to ${username}:`, recentMessages);
     socket.emit('chat history', recentMessages);
   });
@@ -56,6 +69,7 @@ io.on('connection', (socket) => {
       user: msg.user,
       text: msg.text,
       timestamp: Date.now(),
+      isSystemMessage: false
     };
     rooms.get(currentRoom).messages.push(messageData);
     console.log(`Broadcasting message to room ${currentRoom}:`, messageData);
@@ -76,7 +90,16 @@ io.on('connection', (socket) => {
     console.log(`User ${username} leaving`);
     if (currentRoom) {
       rooms.get(currentRoom).users.delete(username);
-      io.to(currentRoom).emit('user left', `${username} has left the conversation`);
+      
+      // Send system message about user leaving
+      const leaveMessage = {
+        user: 'System',
+        text: `${username} has left the conversation`,
+        timestamp: Date.now(),
+        isSystemMessage: true
+      };
+      rooms.get(currentRoom).messages.push(leaveMessage);
+      io.to(currentRoom).emit('new message', leaveMessage);
       
       if (rooms.get(currentRoom).users.size === 0) {
         console.log(`Closing empty room ${currentRoom}`);
@@ -97,7 +120,16 @@ io.on('connection', (socket) => {
       if (username) {
         console.log(`User ${username} disconnected from room ${currentRoom}`);
         rooms.get(currentRoom).users.delete(username);
-        io.to(currentRoom).emit('user left', `${username} has left the conversation`);
+        
+        // Send system message about user disconnecting
+        const disconnectMessage = {
+          user: 'System',
+          text: `${username} has left the conversation`,
+          timestamp: Date.now(),
+          isSystemMessage: true
+        };
+        rooms.get(currentRoom).messages.push(disconnectMessage);
+        io.to(currentRoom).emit('new message', disconnectMessage);
         
         if (rooms.get(currentRoom).users.size === 0) {
           console.log(`Closing empty room ${currentRoom}`);
