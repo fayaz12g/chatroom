@@ -44,7 +44,7 @@ io.on('connection', (socket) => {
     // Send system message about user joining
     const joinMessage = {
       user: 'System',
-      text: `${username} has entered the conversation`,
+      text: `${username} has entered the room`,
       timestamp: Date.now(),
       isSystemMessage: true
     };
@@ -94,7 +94,7 @@ io.on('connection', (socket) => {
       // Send system message about user leaving
       const leaveMessage = {
         user: 'System',
-        text: `${username} has left the conversation`,
+        text: `${username} has left the room`,
         timestamp: Date.now(),
         isSystemMessage: true
       };
